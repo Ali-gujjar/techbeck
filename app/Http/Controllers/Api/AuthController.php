@@ -3,26 +3,35 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\EmailVerificationRequest;
+use App\Services\AuthService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\RegisterRequest;
+use App\Traits\ResponseTrait;
 
 class AuthController extends Controller
 {
-    public function register(RegisterRequest $request)
+    use ResponseTrait;
+    protected $authService;
+
+    public function __construct(AuthService $authService)
     {
-        $user = User::create([
-            'username' => $request->username,
-            'email' => $request->email,
-            'country' => $request->country,
-            'contact_number' => $request->contact_number,
-            'password' => Hash::make($request->password),
-            'user_type' => $request->user_type,
-        ]);
+        $this->authService = $authService;
+    }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+    public function register(RegisterRequest $request): JsonResponse
+    {
+        return $this->authService->registerUser($request);
+    }
 
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-        ], 201);
+    public function verifyEmail(EmailVerificationRequest $request): JsonResponse
+    {
+        return $this->authService->VerifyEmail($request);
+    }
+
+    public function login(Request $request): JsonResponse
+    {
+        return $this->authService->login($request);
     }
 }

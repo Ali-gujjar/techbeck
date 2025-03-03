@@ -2,12 +2,13 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 use App\Traits\ResponseTrait;
 
-class RegisterRequest extends FormRequest
+class UpdateSignalRequest extends FormRequest
 {
     use ResponseTrait;
 
@@ -27,13 +28,9 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => 'required|string',
-            'email' => 'required|email|unique:users',
-            'country' => 'required|string',
-            'country_code' => 'required|string|regex:/^\+\d{1,4}$/',
-            'phone_number' => 'required|string|regex:/^\d{6,15}$/',
-            'password' => 'required|string|min:8|confirmed',
-            'type' => 'required|in:master,slave',
+            'screenshot' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'result_type' => ['nullable', 'string', Rule::in(['profit', 'loss'])],
+            'signal_amount' => 'nullable|string|max:191',
         ];
     }
 
