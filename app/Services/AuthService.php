@@ -48,7 +48,6 @@ class AuthService
                 'country_code' => $user->country_code,
                 'phone_number' => $user->phone_number,
                 'type' => $user->type,
-                'otp' => $otp,
             ]);
 
         }
