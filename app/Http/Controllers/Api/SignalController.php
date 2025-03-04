@@ -5,24 +5,35 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSignalRequest;
 use App\Http\Requests\UpdateSignalRequest;
+use App\Http\Resources\SignalResource;
+use App\Models\Signal;
 use App\Services\SignalService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use App\Traits\ResponseTrait;
+use App\Traits\FileUploadTrait;
 
 class SignalController extends Controller
 {
-    protected $signalService;
-
-    public function __construct(SignalService $signalService)
-    {
-        $this->signalService = $signalService;
-    }
+    use ResponseTrait, FileUploadTrait;
 
     /**
      * Display a listing of the resource.
      */
     public function index(): JsonResponse
     {
-        return $this->signalService->getAllSignals();
+        try {
+            $signals = Signal::where('user_name', auth()->user()->name)->get();
+
+            return $this->successResponse('Signals fetched successfully.', [
+                'signals' => SignalResource::collection($signals)
+            ]);
+        }
+        catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     /**
@@ -38,7 +49,45 @@ class SignalController extends Controller
      */
     public function store(StoreSignalRequest $request): JsonResponse
     {
-        return $this->signalService->storeSignal($request);
+        try {
+            DB::beginTransaction();
+
+            $signal = new Signal();
+            $signal->user_name = auth()->user()->name;
+            $signal->instrument = $request->instrument;
+            $signal->order_type_id = $request->order_type_id;
+            $signal->price = $request->price;
+            $signal->sl = $request->sl;
+            $signal->tp1 = $request->tp1;
+            $signal->tp2 = $request->tp2;
+            $signal->tp3 = $request->tp3;
+            $signal->date_time = $request->date_time;
+            $signal->status = $request->status;
+            $signal->created_by = auth()->id();
+
+
+            if ($request->hasFile('image')) {
+                if ($signal->image) {
+                    $this->deleteFile($signal->image);
+                }
+
+                $signal->image = $this->uploadFile($request->file('image'), 'signals');
+            }
+
+            $signal->trading_chart_link = $request->trading_chart_link ?? null;
+            $signal->save();
+            $signal->load('orderType');
+
+            DB::commit();
+
+            return $this->successResponse('Signal created successfully.', [
+                'signal' => new SignalResource($signal)
+            ]);
+        }
+        catch (\Exception $e) {
+            DB::rollBack();
+            return $this->handleException($e);
+        }
     }
 
     /**
@@ -46,7 +95,20 @@ class SignalController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        return $this->signalService->getSignalById($id);
+        try {
+            $signal = Signal::findOrFail($id);
+
+            $signal->load('orderType');
+            return $this->successResponse('Signal fetched successfully.', [
+                'signal' => new SignalResource($signal)
+            ]);
+        }
+        catch (ModelNotFoundException $e) {
+            return $this->errorResponse('Signal not found.', $e->getMessage(), 404);
+        }
+        catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     /**
@@ -62,7 +124,38 @@ class SignalController extends Controller
      */
     public function update(UpdateSignalRequest $request, int $id): JsonResponse
     {
-        return $this->signalService->updateSignal($request, $id);
+        try {
+            $signal = Signal::findOrFail($id);
+
+            DB::beginTransaction();
+
+            $signal->result_type = $request->result_type;
+            $signal->signal_amount = $request->signal_amount;
+
+            if ($request->hasFile('screenshot')) {
+                if ($signal->screenshot) {
+                    $this->deleteFile($signal->screenshot);
+                }
+
+                $signal->screenshot = $this->uploadFile($request->file('screenshot'), 'screenshots');
+            }
+
+            $signal->save();
+            $signal->load('orderType');
+
+            DB::commit();
+
+            return $this->successResponse('Signal updated successfully.', [
+                'signal' => new SignalResource($signal)
+            ]);
+        }
+        catch (ModelNotFoundException $e) {
+            return $this->errorResponse('Signal not found.', $e->getMessage(), 404);
+        }
+        catch (\Exception $e) {
+            DB::rollBack();
+            return $this->handleException($e);
+        }
     }
 
     /**
@@ -70,6 +163,27 @@ class SignalController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
-        return $this->signalService->deleteSignal($id);
+        try {
+            $signal = Signal::findOrFail($id);
+
+            if ($signal->image) {
+                Storage::disk('public')->delete($signal->image);
+            }
+
+            if ($signal->screenshot) {
+                Storage::disk('public')->delete($signal->screenshot);
+            }
+
+            $signal->delete();
+
+            return $this->successResponse('Signal deleted successfully.', []);
+        }
+        catch (ModelNotFoundException $e) {
+            return $this->errorResponse('Signal not found.', $e->getMessage(), 404);
+        }
+        catch (\Exception $e) {
+            DB::rollBack();
+            return $this->handleException($e);
+        }
     }
 }
