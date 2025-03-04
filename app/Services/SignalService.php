@@ -140,9 +140,7 @@ class SignalService
 
             $signal->delete();
 
-            return $this->successResponse('Signal deleted successfully.', [
-                'signal' => new SignalResource($signal)
-            ]);
+            return $this->successResponse('Signal deleted successfully.', []);
         }
         catch (ModelNotFoundException $e) {
             return $this->errorResponse('Signal not found.', $e->getMessage(), 404);
